@@ -1171,4 +1171,28 @@ mod tests {
 
         drop(zk); // make Packetizer idle
     }
+
+    #[tokio::test]
+    async fn connect_without_watcher_test() {
+        init_tracing_subscriber();
+        let connect_addr = get_test_zookeeper_addr();
+
+        let zk = ZooKeeper::connect_without_watcher(&connect_addr).await.unwrap();
+
+        let path = zk
+            .create(
+                "/no_watcher_test",
+                &b"Hello world"[..],
+                Acl::open_unsafe(),
+                CreateMode::Persistent,
+            )
+            .await
+            .unwrap();
+        assert_eq!(path.as_deref(), Ok("/no_watcher_test"));
+
+        let res = zk.delete("/no_watcher_test", None).await.unwrap();
+        assert_eq!(res, Ok(()));
+
+        drop(zk); // make Packetizer idle
+    }
 }
