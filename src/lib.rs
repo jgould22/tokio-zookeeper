@@ -754,6 +754,8 @@ mod tests {
     use super::*;
 
     use futures::StreamExt;
+    use std::env;
+    use std::net::ToSocketAddrs;
     use tracing::Level;
 
     fn init_tracing_subscriber() {
@@ -762,12 +764,30 @@ mod tests {
             .try_init();
     }
 
+    // Use environment variables to override default connection otherwise
+    // default to localhost:127.0.0.1:2181
+    fn get_test_zookeeper_addr() -> SocketAddr {
+        let host =
+            env::var("TOKIO_ZOOKEEPER_TEST_HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
+
+        let port: u16 = env::var("TOKIO_ZOOKEEPER_TEST_PORT")
+            .unwrap_or_else(|_| "2181".to_string())
+            .parse()
+            .expect("TOKIO_ZOOKEEPER_TEST_PORT must be a valid u16");
+
+        format!("{host}:{port}")
+            .to_socket_addrs()
+            .expect("Invalid host:port")
+            .next()
+            .expect("Host resolved but returned no addresses")
+    }
+
     #[tokio::test]
     async fn it_works() {
         init_tracing_subscriber();
         let builder = ZooKeeperBuilder::default();
 
-        let connect_addr = "127.0.0.1:2181".parse().unwrap();
+        let connect_addr = get_test_zookeeper_addr();
         let (zk, w) = builder.connect(&connect_addr).await.unwrap();
         let (exists_w, stat) = zk.with_watcher().exists("/foo").await.unwrap();
         assert_eq!(stat, None);
@@ -873,7 +893,7 @@ mod tests {
 
     #[tokio::test]
     async fn example() {
-        let connect_addr = "127.0.0.1:2181".parse().unwrap();
+        let connect_addr = get_test_zookeeper_addr();
         let (zk, default_watcher) = ZooKeeper::connect(&connect_addr).await.unwrap();
 
         // let's first check if /example exists. the .watch() causes us to be notified
@@ -958,10 +978,9 @@ mod tests {
     async fn acl_test() {
         init_tracing_subscriber();
         let builder = ZooKeeperBuilder::default();
+        let connect_addr = get_test_zookeeper_addr();
 
-        let (zk, _) = (builder.connect(&"127.0.0.1:2181".parse().unwrap()))
-            .await
-            .unwrap();
+        let (zk, _) = (builder.connect(&connect_addr)).await.unwrap();
         let _ = zk
             .create(
                 "/acl_test",
@@ -1021,11 +1040,9 @@ mod tests {
             }
             Result::<_, Error>::Ok(res)
         }
+        let connect_addr = get_test_zookeeper_addr();
 
-        let (zk, _) = builder
-            .connect(&"127.0.0.1:2181".parse().unwrap())
-            .await
-            .unwrap();
+        let (zk, _) = builder.connect(&connect_addr).await.unwrap();
 
         let res = zk
             .multi()
