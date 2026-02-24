@@ -279,7 +279,18 @@ impl ZooKeeperBuilder {
         let stream = tokio::net::TcpStream::connect(addr)
             .await
             .whatever_context("connect failed")?;
-        Ok((self.handshake(*addr, stream, tx).await?, rx))
+        Ok((self.handshake(*addr, stream, Some(tx)).await?, rx))
+    }
+
+    /// Connect to a ZooKeeper server instance at the given address, but without returning a
+    /// watcher stream.
+    ///
+    /// See [`ZooKeeperBuilder::connect_without_watcher`].
+    pub async fn connect_without_watcher(self, addr: &SocketAddr) -> Result<ZooKeeper, Error> {
+        let stream = tokio::net::TcpStream::connect(addr)
+            .await
+            .whatever_context("connect failed")?;
+        self.handshake(*addr, stream, None).await
     }
 
     /// Set the ZooKeeper [session expiry
@@ -294,7 +305,7 @@ impl ZooKeeperBuilder {
         self,
         addr: SocketAddr,
         stream: tokio::net::TcpStream,
-        default_watcher: futures::channel::mpsc::UnboundedSender<WatchedEvent>,
+        default_watcher: Option<futures::channel::mpsc::UnboundedSender<WatchedEvent>>,
     ) -> Result<ZooKeeper, Error> {
         let request = proto::Request::Connect {
             protocol_version: 0,
@@ -325,6 +336,16 @@ impl ZooKeeper {
         addr: &SocketAddr,
     ) -> Result<(Self, impl Stream<Item = WatchedEvent>), Error> {
         ZooKeeperBuilder::default().connect(addr).await
+    }
+
+    /// Connect to a ZooKeeper server instance at the given address with default parameters,
+    /// but without returning a watcher stream.
+    ///
+    /// See [`ZooKeeperBuilder::connect_without_watcher`].
+    pub async fn connect_without_watcher(addr: &SocketAddr) -> Result<Self, Error> {
+        ZooKeeperBuilder::default()
+            .connect_without_watcher(addr)
+            .await
     }
 
     /// Create a node with the given `path` with `data` as its contents.
