@@ -302,7 +302,7 @@ impl ZooKeeperBuilder {
             timeout: (self.session_timeout.as_secs() * 1_000) as i32
                 + self.session_timeout.subsec_millis() as i32,
             session_id: 0,
-            passwd: vec![],
+            passwd: vec![0u8; 16],
             read_only: false,
         };
         debug!("about to perform handshake");
