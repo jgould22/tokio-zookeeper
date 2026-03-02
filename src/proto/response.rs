@@ -150,13 +150,25 @@ impl<R: Read> StringReader for R {
 impl Response {
     pub(super) fn parse(opcode: OpCode, reader: &mut &[u8]) -> io::Result<Self> {
         match opcode {
-            OpCode::CreateSession => Ok(Response::Connect {
-                _protocol_version: reader.read_i32::<BigEndian>()?,
-                timeout: reader.read_i32::<BigEndian>()?,
-                session_id: reader.read_i64::<BigEndian>()?,
-                password: reader.read_buffer()?,
-                _read_only: reader.read_u8()? != 0,
-            }),
+            OpCode::CreateSession => {
+                let protocol_version = reader.read_i32::<BigEndian>()?;
+                let timeout = reader.read_i32::<BigEndian>()?;
+                let session_id = reader.read_i64::<BigEndian>()?;
+                let password = reader.read_buffer()?;
+                // read_only byte may be absent (e.g. ClickHouse Keeper omits it)
+                let read_only = if reader.is_empty() {
+                    false
+                } else {
+                    reader.read_u8()? != 0
+                };
+                Ok(Response::Connect {
+                    _protocol_version: protocol_version,
+                    timeout,
+                    session_id,
+                    password,
+                    _read_only: read_only,
+                })
+            }
             OpCode::Exists | OpCode::SetData | OpCode::SetACL => {
                 Ok(Response::Stat(Stat::read_from(reader)?))
             }
